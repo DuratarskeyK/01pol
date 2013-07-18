@@ -1,0 +1,21 @@
+#!/bin/bash
+
+if [ $# -ne 2 ]
+then
+	echo "Usage: polcnt [filename] [vertex num]"
+	exit 1
+fi
+
+if [ -e $1 ]
+then
+	a=`du -b $1 | awk '{print $1}'`
+	if [ $(($a % $2)) -ne 0 ]
+	then
+		echo "Wrong vertex count."
+	else
+		echo $(($a / $2))
+	fi
+else
+	echo "No such file."
+	exit 1
+fi

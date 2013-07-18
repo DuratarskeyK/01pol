@@ -3,11 +3,16 @@
 #include <stdlib.h>
 
 int main(int argc, char *argv[]) {
-        int num_vert = atoi(argv[2]), t;
+        int num_vert, t;
         unsigned char *a, *b, *c;
 
-        FILE *fp = fopen(argv[1], "r");
+	if(argc != 3) {
+		printf("Usage: dupe [file] [vertex number]\n");
+		return 1;
+	}
 
+	FILE *fp = fopen(argv[1], "r");
+	num_vert = atoi(argv[2]);
         a = (unsigned char *)malloc(num_vert);
         b = (unsigned char *)malloc(num_vert);
         c = (unsigned char *)malloc(num_vert);
