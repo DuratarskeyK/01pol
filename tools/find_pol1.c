@@ -32,13 +32,14 @@ int facet_cnt(vertex *poly, int nv) {
 
 	P = lrs_alloc_dic(Q);
 	
+	for(i = 0; i<Q->n; i++)
+		den[i] = 1;
+	
 	for(row = 1; row<=nv; row++) {
 		num[0] = 1;
 
-		for(i=1,t=0;i<dim+1; i++, t++) {
+		for(i=1,t=0;i<dim+1; i++, t++)
 			num[dim+1-i] = (poly[row-1]>>t)&1;
-			den[t] = 1;
-		}
 
 		lrs_set_row(P, Q, row, num, den, GE);
 	}
