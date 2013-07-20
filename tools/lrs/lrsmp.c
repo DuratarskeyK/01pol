@@ -618,6 +618,21 @@ pmp (char name[], lrs_mp a)	/*print the long precision integer a */
   fprintf (lrs_ofp, " ");
 }
 
+void
+spmp (char *out, lrs_mp a)	/*sprintf version of pmp for Wolfram Mathematica module */
+{
+  long i, n;
+  char *p;
+  p = out;
+  if (sign (a) == NEG)
+    sprintf (p++, "-");
+  n = sprintf (p, "%lu", a[length (a) - 1]);
+  p += n;
+  for (i = length (a) - 2; i >= 1; i--) {
+    n = sprintf (p, FORMAT, a[i]);
+    p += n;
+  }
+}
 
 void 
 prat (char name[], lrs_mp Nin, lrs_mp Din)	/*reduce and print Nin/Din  */

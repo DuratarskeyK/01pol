@@ -177,6 +177,7 @@ long mptoi (lrs_mp a);		/* convert lrs_mp to long integer */
 void mulint (lrs_mp a, lrs_mp b, lrs_mp c);	/* multiply two integers a*b --> c                */
 void normalize (lrs_mp a);	/* normalize lrs_mp after computation             */
 void pmp (char name[], lrs_mp a);	/* print the long precision integer a             */
+void spmp (char *out, lrs_mp a);	/* sprintf of pmp for Wolfram Mathmatica module           */
 void prat (char name[], lrs_mp Nt, lrs_mp Dt);	/* reduce and print  Nt/Dt                        */
 void readmp (lrs_mp a);		/* read an integer and convert to lrs_mp          */
 long readrat (lrs_mp Na, lrs_mp Da);	/* read a rational or int and convert to lrs_mp   */
