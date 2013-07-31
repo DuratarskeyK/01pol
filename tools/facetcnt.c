@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <mpi.h>
+#include <zlib.h>
 
 #include "common.h"
 #include "lrs/lrslib.h"
@@ -116,18 +117,30 @@ int main(int argc, char *argv[]) {
 	dim = atoi(argv[3]);
 
 	if(!tid) {
-		int num, elem, op, cnt = nthreads-1, min = 1000000, max = 0, fmin, fmax;
+		int num, elem, op, cnt = nthreads-1, min = 1000000, max = 0, fmin, fmax, len, usegz = 0;
 		long long total = 0;
 		vertex *rcv;
 		FILE *in;
+		gzFile gin;
 		MPI_Status status;
 
-		in = fopen(argv[1], "r");
+		len = strlen(argv[1]);
+		if(argv[1][len-1]=='z' && argv[1][len-2] == 'g' && argv[1][len-3] == '.') 
+			usegz = 1;
+		
+		if(usegz)
+			gin = gzopen(argv[1], "r");
+		else
+			in = fopen(argv[1], "r");
 		rcv = (vertex *)malloc(num_vert*RCV_SIZE);
 
 		while(cnt) {
 			MPI_Recv(&num, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-			elem = fread(rcv, num_vert, RCV_SIZE, in);
+			if(usegz)
+				elem = (gzread(gin, rcv, num_vert*RCV_SIZE))/num_vert;
+			else
+				elem = fread(rcv, num_vert, RCV_SIZE, in);
+
 			if(!elem) {
 				op = 1;
 				MPI_Send(&op, 1, MPI_INT, num, 0, MPI_COMM_WORLD);
@@ -146,7 +159,10 @@ int main(int argc, char *argv[]) {
 		MPI_Reduce(&min, &fmin, 1, MPI_INT, MPI_MIN, 0, MPI_COMM_WORLD);
 		MPI_Reduce(&max, &fmax, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
 		printf("%d %d\n", fmin, fmax);
-		fclose(in);
+		if(usegz)
+			gzclose(gin);
+		else
+			fclose(in);
 	}
 	else {
 		work();
