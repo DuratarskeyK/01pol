@@ -26,10 +26,12 @@
 
 /* Globals; these need to be here, rather than lrslib.h, so they are
    not multiply defined. */
+
 #undef fprintf
 #undef printf
 #define printf(...)
 #define fprintf(...)
+
 FILE *lrs_cfp;			/* output file for checkpoint information       */
 FILE *lrs_ifp;			/* input file pointer       */
 FILE *lrs_ofp;			/* output file pointer      */

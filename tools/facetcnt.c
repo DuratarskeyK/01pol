@@ -118,9 +118,10 @@ int main(int argc, char *argv[]) {
 
 	if(!tid) {
 		int num, elem, op, cnt = nthreads-1, min = 1000000, max = 0, fmin, fmax, len, usegz = 0;
+		char name[200];
 		long long total = 0;
 		vertex *rcv;
-		FILE *in;
+		FILE *in, *out;
 		gzFile gin;
 		MPI_Status status;
 
@@ -158,7 +159,12 @@ int main(int argc, char *argv[]) {
 		printf("Finished dispatching...\n");
 		MPI_Reduce(&min, &fmin, 1, MPI_INT, MPI_MIN, 0, MPI_COMM_WORLD);
 		MPI_Reduce(&max, &fmax, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
-		printf("%d %d\n", fmin, fmax);
+
+		sprintf(name, "%s.cnt", argv[1]);
+		out = fopen(name, "w");
+		fprintf(out, "%d %d\n", fmin, fmax);
+		fclose(out);
+
 		if(usegz)
 			gzclose(gin);
 		else
