@@ -1,15 +1,7 @@
 #include "increase_new.h"
 
-#include "ClpSimplex.hpp"
-#include "CoinTime.hpp"
-#include "CoinModel.hpp"
-
 long int poly_num, input_num;
 
-sint neighb_array[256];  // Для проверки на 2-смежностность
-char *vert_flag; // Какие вершины можно использовать в дальнейшем
-unsigned long int *mask_array; // Ускоряет работу фильтра 2-neighborly
-double all_check, num_tested;
 int tid, num_recs, nthreads, buf_i, len;
 char dim;
 
@@ -21,25 +13,6 @@ sint *optimum; // Текущий оптимум c числом вершин в �
 sint *cur_rang_vertices; // Содержит вершины текущего ранга
 sint **rang_table;	// Буферный массив для упорядочения вершин
 sint ***recursive_sort_array; // Размеры [dim+1][2][num_vert] 
-
-int rowIndex[16][128];
-double rowValue[16][128];
-ClpSimplex  modelSample;
-
-int alloc_flag(char dim, sint num_vert)
-{
-	vert_flag = (char *)calloc(1 << dim, 1);
-	if (vert_flag == NULL) return 1;
-	mask_array = (unsigned long int *)calloc((num_vert*(num_vert+1))/2, sizeof(unsigned long int));
-	if (mask_array == NULL) return 1;
-	return 0;
-}
-
-void free_flag()
-{
-	free (vert_flag);
-	free (mask_array);
-}
 
 int array_alloc(char dim, sint max_num_vertices)
 {
@@ -74,10 +47,6 @@ int array_alloc(char dim, sint max_num_vertices)
 			return 1;
 	}
 
-	for(i = 0; i<16; i++)
-		for(j = 0; j<128; j++)
-			rowValue[i][j] = 1.0;
-
 	return 0;
 }
 
@@ -100,261 +69,6 @@ int array_free(char dim)
 	free (recursive_sort_array);
 
 	return 0;
-}
-
-int init_modelSample(char dim, sint num_vert)
-{
-	modelSample.allSlackBasis();
-	// Switch off messages
-	modelSample.setLogLevel(0); 
-	// Create space for ncols columns
-	modelSample.resize(0, num_vert-2);
-	// Fill in
-
-	modelSample.setObjectiveCoefficient(0, 1.0);
-	for (int i = 0; i < num_vert-2; i++) 
-	{
-		modelSample.setColumnUpper(i, COIN_DBL_MAX);
-	}
-	return 0;
-}
-
-
-void exchange (int i, int j)
-{
-	unsigned long int buf_m = mask_array[i];
-	mask_array[i] = mask_array[j];
-	mask_array[j] = buf_m;
-}
-
-int is_cmpexchange (int i, int j)
-{
-	if (mask_array[i] > mask_array[j]) exchange (i, j);
-	return (mask_array[j] - mask_array[i] == 0);
-}
-
-int is_sort3 (int l, int r)
-{
-	if (r-l <= 0) return 0;
-	// Отладочная запись
-	if (r-l > 2) {printf ("sort3 error, size = %d > 3\n", r-l+1); getchar (); return 0;}
-	// Позже ее следует удалить
-	if (is_cmpexchange (l, l+1)) return 1;
-	if (r-l == 2)
-	{
-		if (is_cmpexchange (l, r)) return 1;
-		if (is_cmpexchange (l+1, r)) return 1;
-	}
-	return 0;
-}
-
-int is_coincide_mask (int l, int r)
-{
-	if (r-l < 3) {return is_sort3 (l, r);}
-	int j;
-	exchange ((l+r)/2, r-1);
-	if (is_cmpexchange (l, r)) return 1;
-	if (is_cmpexchange (l, r-1)) return 1;
-	if (is_cmpexchange (r, r-1)) return 1;
-	// Теперь медиана в mask_array[r]
-	unsigned long int b = mask_array[r];
-	j = r;
-	int i = l-1;
-	for (;;)
-	{
-		while (mask_array[++i] < b) ;
-		if (mask_array[i] == b) return 1;
-		while (mask_array[--j] > b) 
-			if (j <= i) break;
-		if (j <= i) break;
-		if (mask_array[j] == b) return 1;
-		exchange (i, j);
-	}
-	exchange (r, i);
-	if (is_coincide_mask (l, i-1)) return 1;
-	if (is_coincide_mask (i+1, r)) return 1;
-	return 0;
-}
-
-// Число единичек в битовом представлении m
-inline int bitnum (sint m, int dim)
-{
-	int cnt = 0, i;
-	for(i = 0; i<dim; i++)
-		cnt+=(m>>i)&1;
-
-	return cnt;
-}
-
-// Ускоренная проверка на 2-смежностность
-// массив tested
-// numv - число вершин
-// dim - размерность
-// Возвращаем 0, если найдена пара несмежных вершин (ребро отсутствует)
-int check2neighb_fast(sint *tested, sint numv, char dim)
-{
-	int len = 0, i, j;
-	for (i = 0; i < numv-1; i++)
-		for (j = i+1; j < numv; j++)
-		{
-			unsigned long int b = ~(tested[i]^tested[j]) & ((1 << dim) - 1);
-			mask_array[len++] = (b << (2*CHAR_BIT)) + (b & tested[i]);
-		}
-	if (is_coincide_mask (0, len-1)) return 0;
-
-	return 1;
-}
-
-
-// Проверяем вершины tv[0] и tv[1] на смежность
-// Если смежны, возвращаем 0
-inline int alfa_beta (int p, int dim )
-{
-	if (p <= 3)
-		return 0;
-	/* Выполняем переключение с первой вершиной tv[0]*/
-	int i,j;
-	for (i = 1; i < p; i++)
-		neighb_array[i] = neighb_array[i] ^ neighb_array[0];
-
-	for (i = 2; i < p - 1; i++)
-		for (j = i + 1; j < p; j++)
-			if ( (neighb_array[i]^neighb_array[j]) == neighb_array[1] )
-				return 1;
-
-	return 0;
-}
-
-int alfa(int ncols, int dim, int nrows)
-{
-		// Empty model
-		ClpSimplex  model = modelSample;
-		// Now use model
-		CoinModel modelObject;
-		int i;
-		sint m = 1 << (dim-1);
-		for (i = 0; m; m >>= 1) 
-		{
-			if (m & neighb_array[1])
-			{
-				int n_one = 0;
-				for (int j = 0; j < ncols; j++)
-					if (m & neighb_array[j+2])
-					{
-						rowIndex[i][n_one] = j;
-						rowValue[i][n_one] = 1.0;
-						n_one++;
-					}
-				if (n_one == 0 || n_one == ncols) 
-					return 0;
-				modelObject.addRow(n_one, rowIndex[i], rowValue[i], 1.0, 1.0);
-				i++;
-			}
-		}
-
-		model.addRows(modelObject);
-		if (model.dual() == 1)
-			return 0;
-		return 1;
-}
-
-// Проверяем на 2-смежностность
-// массив tested
-// numv - число вершин
-// dim - размерность
-// Возвращаем 0, если найдена пара несмежных вершин (ребро отсутствует)
-int check2neighb_inc(sint *tested, sint numv, char dim)
-{
-	int j = numv - 1; 
-	for (int i = 0; i < numv-1; i++) 
-	{
-		neighb_array[0] = 0;//tested[i];
-		neighb_array[1] = tested[j]^tested[i];
-		sint m = ~(neighb_array[1]) & ((1 << dim) - 1);
-		int diff = dim - bitnum (m, dim);
-//		if (diff < 3)
-//			continue;
-		int p;
-
-		if (diff > 2)
-		{
-			p = 2;
-			sint tb;
-			for (int k = 0; k < numv; k++)
-			{
-				tb = tested[i]^tested[k];
-				if ( (tb & m) == 0 && k != i && k != j)
-						neighb_array[p++] = tb;
-			}
-			if (p > 4)
-			{
-				if (p > vert_limit[diff])
-					return 0;
-				all_check += 1;
-				num_tested += 1;
-				if ( alfa (p-2, dim, diff) )
-					return 0;
-			}
-		}
-	}
-
-	for (int i = 0; i < numv-2; i++) 
-	{
-		for (j = i+1; j < numv-1; j++) 
-		{
-			neighb_array[0] = 0;//tested[i];
-			neighb_array[1] = tested[j]^tested[i];
-			sint m = ~(neighb_array[1]) & ((1 << dim) - 1);
-			int diff = dim - bitnum (m, dim);
-//			if (diff < 3)
-//				continue;
-			int p;
-
-			if (diff > 2)
-			{
-				int is_test = 0;
-				p = 2;
-				sint tb;
-				for (int k = 0; k < numv; k++)
-				{
-					tb = tested[i]^tested[k];
-					if ( (tb & m) == 0 && k != i && k != j)
-					{
-						neighb_array[p++] = tb;
-						if (k == numv-1)
-							is_test = 1;
-					}
-				}
-				if (p > 4)
-				{
-					if (p > vert_limit[diff])
-						return 0;
-					all_check += 1;
-					if (is_test)
-					{	
-						num_tested += 1;
-						if ( alfa (p-2, dim, diff) )
-							return 0;
-					}
-				}
-			}
-		}	
-	}
-	return 1;
-}
-
-int check_lim(sint *tested, sint numv, char dim)
-{
-	// Проверяем стороны куба на минимальное число вершин
-	for (int i = 0; i < dim; i++)
-	{
-		int k = 0;
-		for (int j = 0; j < numv; j++)
-			k += ((tested[j]) >> i) & 1;
-		if (k > vert_limit[dim-1] || numv - k > vert_limit[dim-1])
-			return 0;
-	}
-	return 1;
 }
 
 // Рекурсивная процедура по поиску оптимальной перестановки координат
@@ -598,20 +312,17 @@ void increase ()
 	char name[20];
 	sint *buffer, *rcv, vert[30];
 	FILE *out;
+	char *vert_flag;
 	
 	array_alloc(dim, num_vert+1);	
-	if (alloc_flag(dim, num_vert)) {
-		printf ("Can't allocate memory\n");
-		return;
-	}
-	
-	if(num_vert > 2)
-		init_modelSample(dim, num_vert+1);
-	
+
+	init_adj(num_vert+1);
+	return;
 	buffer = (sint *)malloc((num_vert+1)*1ULL*BUFF_SIZE);
 	rcv = (sint *)malloc(num_vert*RCV_SIZE);
 	ones = (int *)malloc(dim*sizeof(int));
-		
+	vert_flag = (char *)calloc(1 << dim, 1);
+
 	k = 0;
 	
 	num_vert++;
@@ -666,6 +377,7 @@ void increase ()
 					}
 					if (is_write) 
 						is_write = check2neighb_fast (vert, num_vert, dim);
+					
 					if (is_write && check2neighb_inc (vert, num_vert, dim))
 					{
 						representative(dim, vert);
@@ -702,11 +414,11 @@ void increase ()
 			s+=num_vert;
 		s+=num_vert;
 	}
-	
 	fclose(out);
 	free(buffer);
 	free(rcv);
-	free_flag();
+	free_adj();
+
 	array_free(dim);
 }
 

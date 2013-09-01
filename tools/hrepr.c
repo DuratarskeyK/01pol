@@ -11,7 +11,7 @@ void HRepresentation(void) {
 	lrs_dat *Q;
 	lrs_mp_matrix Lin;
 	lrs_mp_vector output;
-	
+
 	if(!MLGetInteger32Array(stdlink, &a, &dims, &heads, &depth)) {
 		return ;
 	}
@@ -26,18 +26,18 @@ void HRepresentation(void) {
 	Q->getvolume = FALSE;
 
 	P = lrs_alloc_dic(Q);
-	
+
 	output = lrs_alloc_mp_vector(Q->n);
 	num = malloc((dims[1]+1)*sizeof(long));
 	den = malloc((dims[1]+1)*sizeof(long));
 
 	for(row = 1; row <= Q->m; row++) {
 		num[0] = den[0] = 1;
-		
+
 		for(i = 1; i<Q->n; i++) {
 			num[i] = a[i-1 + (row-1)*dims[1]], den[i] = 1;
 		}
-		
+
 		lrs_set_row(P, Q, row, num, den, GE);
 	}
 

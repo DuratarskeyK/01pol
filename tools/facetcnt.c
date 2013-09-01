@@ -6,67 +6,17 @@
 #include <unistd.h>
 #include <mpi.h>
 #include <zlib.h>
-
-#include "common.h"
-#include "lrs/lrslib.h"
+#include <polytool.h>
+#include <common.h>
 
 int num_vert, dim, tid, nthreads;
-//useless
-lrs_mp_vector output;
-
-int facet_cnt(vertex *poly, int nv) {
-	lrs_dic *P;
-	lrs_dat *Q;
-	long col, row, i, t;
-	int ans;
-	lrs_mp_matrix Lin;
-	long num[24];
-	long den[24];
-
-	Q = lrs_alloc_dat ("LRS globals");
-	
-	Q->m = nv;
-	Q->n = dim+1;
-	Q->hull = TRUE;
-	Q->polytope = TRUE;
-	Q->getvolume = FALSE;
-
-	P = lrs_alloc_dic(Q);
-	
-	for(i = 0; i<Q->n; i++)
-		den[i] = 1;
-	
-	for(row = 1; row<=nv; row++) {
-		num[0] = 1;
-
-		for(i=1,t=0;i<dim+1; i++, t++) {
-			num[dim+1-i] = (poly[row-1]>>t)&1;
-		}
-
-		lrs_set_row(P, Q, row, num, den, GE);
-	}
-	
-	lrs_getfirstbasis(&P, Q, &Lin, TRUE);
-
-	do {
-		for(col = 0; col <= P->d; col++)
-			lrs_getsolution(P, Q, output, col);
-	} while(lrs_getnextbasis(&P, Q, FALSE));
-	
-	ans = Q->count[0];
-
-	lrs_free_dic (P,Q);
-	lrs_free_dat (Q);
-	return ans;
-}
 
 void work() {
 	int op, size, i, min = 100000, max = 0, cur, fmin, fmax;
 	MPI_Status status;
 	vertex *rcv;
 
-	lrs_init("");
-	output = lrs_alloc_mp_vector(dim+1);
+	init_lrs();
 
 	rcv = (vertex *)malloc(num_vert*RCV_SIZE);
 	
@@ -83,7 +33,7 @@ void work() {
 		//do stuff with polytopes
 		for(i = 0; i<size; i++) {
 			//current polytope is in rcv + i*num_vert
-			cur = facet_cnt(rcv+i*num_vert, num_vert);
+			cur = facet_cnt(rcv+i*num_vert, num_vert, dim);
 			if(cur > max)
 				max = cur;
 			if(cur < min)
@@ -94,8 +44,7 @@ void work() {
 	MPI_Reduce(&min, &fmin, 1, MPI_INT, MPI_MIN, 0, MPI_COMM_WORLD);
 	MPI_Reduce(&max, &fmax, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
 
-	lrs_clear_mp_vector(output, dim+1);
-	lrs_close("");
+	free_lrs();
 
 	free(rcv);
 }

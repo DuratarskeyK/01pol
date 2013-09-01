@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
 				for(j = 1; j<dim; j++) {
 					if(zero(output[j]))
 						continue;
-					if(sgn) 
+					if(sgn)
 						printf(" %c", positive(output[i])?'+':'-');
 					if(!sgn)
 						sgn = 1;

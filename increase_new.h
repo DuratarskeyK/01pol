@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <mpi.h>
+#include <polytool.h>
 
 #define BUFF_SIZE 90000000
 #define RCV_SIZE 350

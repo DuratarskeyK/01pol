@@ -4,7 +4,7 @@
 
 int main(int argc, char *argv[]) {
         int num_vert, t;
-        unsigned char *a, *b, *c;
+        unsigned char *a, *b;
 
 	if(argc != 3) {
 		printf("Usage: dupe [file] [vertex number]\n");
@@ -15,8 +15,7 @@ int main(int argc, char *argv[]) {
 	num_vert = atoi(argv[2]);
         a = (unsigned char *)malloc(num_vert);
         b = (unsigned char *)malloc(num_vert);
-        c = (unsigned char *)malloc(num_vert);
-        fread(a, num_vert, 1, fp);
+        t = fread(a, num_vert, 1, fp);
 
         while(1) {
                 t = fread(b, num_vert, 1, fp);
